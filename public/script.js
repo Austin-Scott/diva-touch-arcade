@@ -3,6 +3,12 @@ const websocket = new WebSocket('ws://' + window.location.host + '/ws')
 // Adjusts how tall the touch slider area is
 const sliderHeightRatio = 0.5
 
+// Adjusts how far you need to slide before the slide state changes
+const sliderDistanceThreshold = 0.01
+
+// Adjusts how wide the touch slider touch indicator is
+const touchIndicatorWidthRatio = 1.0 / 32.0
+
 // Display and input variables
 let w, h
 let sliderX, sliderY, sliderWidth, sliderHeight
@@ -20,6 +26,24 @@ let sliderOneRight = false
 let sliderOneLeft = false
 let sliderTwoRight = false
 let sliderTwoLeft = false
+
+// For haptics
+let previousTriangleDown = false
+let previousSquareDown = false
+let previousXDown = false
+let previousCircleDown = false
+
+// For touch slider state
+let sliderOneTouchId = null
+let sliderOneStartX = null
+let sliderOneCurrentX = null
+let sliderOneMaxX = null
+let sliderOneDirection = 0
+let sliderTwoTouchId = null
+let sliderTwoStartX = null
+let sliderTwoCurrentX = null
+let sliderTwoMaxX = null
+let sliderTwoDirection = 0
 
 function addIf(flag, index) {
     if(!flag) return 0
@@ -44,8 +68,8 @@ function isPointInside(px, py, x, y, w, h) {
 }
 
 function updateVars() {
-    w = window.innerWidth
-    h = window.innerHeight
+    w = screen.width
+    h = screen.height
 
     sliderX = 0
     sliderY = 0
@@ -76,7 +100,24 @@ updateVars()
 
 function setup() {
     canvas=createCanvas(w, h)
-    background(200)
+    frameRate(120)
+}
+
+function updateHaptics() {
+    if((!previousTriangleDown && triangleDown) 
+        || (!previousSquareDown && squareDown) 
+        || (!previousXDown && xDown) 
+        || (!previousCircleDown && circleDown)) {
+
+        if(navigator && navigator.vibrate) {
+            navigator.vibrate(50)
+        }
+    }
+
+    previousTriangleDown = triangleDown
+    previousSquareDown = squareDown
+    previousXDown = xDown
+    previousCircleDown = circleDown
 }
 
 function updateFaceButtons() {
@@ -101,11 +142,140 @@ function updateFaceButtons() {
 }
 
 function updateSliders() {
-    // TODO
+    sliderOneLeft = false
+    sliderOneRight = false
+    sliderTwoLeft = false
+    sliderTwoRight = false
+
+    let sliderOneUpdatedFlag = false
+    let sliderTwoUpdatedFlag = false
+
+    // const testTouches = []
+    // if(mouseIsPressed) {
+    //     testTouches.push({
+    //         x: mouseX,
+    //         y: mouseY,
+    //         id: 1
+    //     })
+    // }
+
+    // for(const touch of testTouches) {
+    for(const touch of touches) {
+        if(isPointInside(touch.x, touch.y, sliderX, sliderY, sliderWidth, sliderHeight)) {
+            if(touch.id == sliderOneTouchId) {
+                sliderOneUpdatedFlag = true
+                sliderOneCurrentX = touch.x
+                if(sliderOneDirection == 0) {
+                    if(sliderOneCurrentX - sliderOneStartX > w * sliderDistanceThreshold) {
+                        sliderOneDirection = 1
+                        sliderOneRight = true
+                        sliderOneMaxX = sliderOneCurrentX
+                    } else if(sliderOneStartX - sliderOneCurrentX > w * sliderDistanceThreshold) {
+                        sliderOneDirection = -1
+                        sliderOneLeft = true
+                        sliderOneMaxX = sliderOneCurrentX
+                    }
+                } else if(sliderOneDirection == -1) {
+                    if(sliderOneCurrentX < sliderOneMaxX) {
+                        sliderOneMaxX = sliderOneCurrentX
+                    }
+                    if(sliderOneCurrentX - sliderOneMaxX > w * sliderDistanceThreshold) {
+                        sliderOneDirection = 1
+                        sliderOneRight = true
+                        sliderOneStartX = sliderOneCurrentX
+                        sliderOneMaxX = sliderOneCurrentX
+                    } else {
+                        sliderOneLeft = true
+                    }
+                } else {
+                    if(sliderOneCurrentX > sliderOneMaxX) {
+                        sliderOneMaxX = sliderOneCurrentX
+                    }
+                    if(sliderOneMaxX - sliderOneCurrentX > w * sliderDistanceThreshold) {
+                        sliderOneDirection = -1
+                        sliderOneLeft = true
+                        sliderOneStartX = sliderOneCurrentX
+                        sliderOneMaxX = sliderOneCurrentX
+                    } else {
+                        sliderOneRight = true
+                    }
+                }
+            } else if (touch.id == sliderTwoTouchId) {
+                sliderTwoUpdatedFlag = true
+                sliderTwoCurrentX = touch.x
+                if(sliderTwoDirection == 0) {
+                    if(sliderTwoCurrentX - sliderTwoStartX > w * sliderDistanceThreshold) {
+                        sliderTwoDirection = 1
+                        sliderTwoRight = true
+                        sliderTwoMaxX = sliderTwoCurrentX
+                    } else if(sliderTwoStartX - sliderTwoCurrentX > w * sliderDistanceThreshold) {
+                        sliderTwoDirection = -1
+                        sliderTwoLeft = true
+                        sliderTwoMaxX = sliderTwoCurrentX
+                    }
+                } else if(sliderTwoDirection == -1) {
+                    if(sliderTwoCurrentX < sliderTwoMaxX) {
+                        sliderTwoMaxX = sliderTwoCurrentX
+                    }
+                    if(sliderTwoCurrentX - sliderTwoMaxX > w * sliderDistanceThreshold) {
+                        sliderTwoDirection = 1
+                        sliderTwoRight = true
+                        sliderTwoStartX = sliderTwoCurrentX
+                        sliderTwoMaxX = sliderTwoCurrentX
+                    } else {
+                        sliderTwoLeft = true
+                    }
+                } else {
+                    if(sliderTwoCurrentX > sliderTwoMaxX) {
+                        sliderTwoMaxX = sliderTwoCurrentX
+                    }
+                    if(sliderTwoMaxX - sliderTwoCurrentX > w * sliderDistanceThreshold) {
+                        sliderTwoDirection = -1
+                        sliderTwoLeft = true
+                        sliderOTwotartX = sliderTwoCurrentX
+                        sliderTwoMaxX = sliderTwoCurrentX
+                    } else {
+                        sliderTwoRight = true
+                    }
+                }
+
+            } else if(sliderOneTouchId == null) {
+                sliderOneUpdatedFlag = true
+                sliderOneTouchId = touch.id
+                sliderOneStartX = touch.x
+                sliderOneCurrentX = touch.x
+                sliderOneMaxX = touch.x
+                sliderOneDirection = 0
+            } else if(sliderTwoTouchId == null) {
+                sliderTwoUpdatedFlag = true
+                sliderTwoTouchId = touch.id
+                sliderTwoStartX = touch.x
+                sliderTwoCurrentX = touch.x
+                sliderTwoMaxX = touch.x
+                sliderTwoDirection = 0
+            }
+        }
+    }
+    if(!sliderOneUpdatedFlag) {
+        sliderOneTouchId = null
+        sliderOneStartX = null
+        sliderOneCurrentX = null
+        sliderOneMaxX = null
+        sliderOneDirection = 0
+    }
+    if(!sliderTwoUpdatedFlag) {
+        sliderTwoTouchId = null
+        sliderTwoStartX = null
+        sliderTwoCurrentX = null
+        sliderTwoMaxX = null
+        sliderTwoDirection = 0
+    }
 }
 
 function update() {
+    updateVars()
     updateFaceButtons()
+    updateHaptics()
     updateSliders()
     sendState()
 }
@@ -115,13 +285,49 @@ function draw() {
 
     fill(color('#807f8f'))
     rect(sliderX, sliderY, sliderWidth, sliderHeight)
-    fill(color('#27bb64'))
+    if(sliderOneCurrentX != null) {
+        fill(color('#ffffff'))
+        const indicatorWidth = touchIndicatorWidthRatio * w
+        const indicatorX = sliderOneCurrentX - (indicatorWidth / 2.0)
+        const indicatorY = 0
+        const indicatorHeight = sliderHeight
+        rect(indicatorX, indicatorY, indicatorWidth, indicatorHeight)
+    }
+    if(sliderTwoCurrentX != null) {
+        fill(color('#ffffff'))
+        const indicatorWidth = touchIndicatorWidthRatio * w
+        const indicatorX = sliderTwoCurrentX - (indicatorWidth / 2.0)
+        const indicatorY = 0
+        const indicatorHeight = sliderHeight
+        rect(indicatorX, indicatorY, indicatorWidth, indicatorHeight)
+    }
+
+    if(triangleDown) {
+        fill(color('#000000'))
+    } else {
+        fill(color('#27bb64'))
+    }
     rect(triangleX, triangleY, triangleWidth, triangleHeight)
-    fill(color('#ee76bc'))
+
+    if(squareDown) {
+        fill(color('#000000'))
+    } else {
+        fill(color('#ee76bc'))
+    }
     rect(squareX, squareY, squareWidth, squareHeight)
-    fill(color('#3ea7ec'))
+
+    if(xDown) {
+        fill(color('#000000'))
+    } else {
+        fill(color('#3ea7ec'))
+    }
     rect(xX, xY, xWidth, xHeight)
-    fill(color('#dd595e'))
+
+    if(circleDown) {
+        fill(color('#000000'))
+    } else {
+        fill(color('#dd595e'))
+    }
     rect(circleX, circleY, circleWidth, circleHeight)
 }
 
